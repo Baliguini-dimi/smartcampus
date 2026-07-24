@@ -7,9 +7,11 @@
 | Couche | Choix | Justification |
 |---|---|---|
 | Framework | **Next.js 15 (App Router)** + TypeScript | SSR/SSG natif, SEO fort, écosystème le plus demandé actuellement |
-| UI | **Tailwind CSS** + **shadcn/ui** (Radix primitives) | Composants accessibles, personnalisables, pas de look "template IA" |
+<!-- MODIFICATION : UI remplacée -->
+| UI | **Tailwind CSS** + **shadcn/ui** (base **Base UI**, style **Vega**) | Base UI choisi plutôt que Radix (rachat WorkOS, maintenance ralentie) |
 | Base de données | **PostgreSQL** | Standard robuste, JSON natif, compatible Prisma |
-| ORM | **Prisma** | Typage bout en bout, migrations versionnées, lisible |
+<!-- MODIFICATION : ORM remplacé -->
+| ORM | **Prisma 7** | ⚠️ Depuis la v7, l'URL de connexion se configure dans `prisma.config.ts`, plus dans `schema.prisma` |
 | Auth | **NextAuth.js (Auth.js) v5** | Sessions sécurisées, multi-provider, compatible RBAC custom |
 | IA | **Groq API (LLaMA)** | Conservé du projet original |
 | Paiement | **CinetPay** (Mobile Money) | Conservé — adapté au marché cible |
@@ -20,52 +22,51 @@
 | CI/CD | **GitHub Actions** | Lint, tests, build à chaque PR |
 
 ## 2. Structure de dossiers cible
-
-```
 smartcampus/
-├── app/                          # App Router Next.js
-│   ├── (marketing)/              # Pages publiques : landing, pricing, about
-│   │   ├── page.tsx
-│   │   ├── pricing/page.tsx
-│   │   └── layout.tsx
-│   ├── (auth)/                   # Login, register, reset password
-│   │   ├── login/page.tsx
-│   │   ├── register/page.tsx
-│   │   └── layout.tsx
-│   ├── (app)/                    # Espace applicatif authentifié
-│   │   ├── dashboard/page.tsx
-│   │   ├── students/
-│   │   ├── professors/
-│   │   ├── courses/
-│   │   ├── grades/
-│   │   ├── messages/
-│   │   ├── ai/
-│   │   ├── finance/
-│   │   └── layout.tsx            # Sidebar + garde d'auth + garde de rôle
-│   ├── (super-admin)/            # Back-office multi-tenant
-│   ├── api/                      # Route handlers (webhooks CinetPay, etc.)
-│   └── layout.tsx                # Layout racine + metadata SEO globale
+├── app/ # App Router Next.js
+│ ├── (marketing)/ # Pages publiques : landing, pricing, about
+│ │ ├── page.tsx
+│ │ ├── pricing/page.tsx
+│ │ └── layout.tsx
+│ ├── (auth)/ # Login, register, reset password
+│ │ ├── login/page.tsx
+│ │ ├── register/page.tsx
+│ │ └── layout.tsx
+│ ├── (app)/ # Espace applicatif authentifié
+│ │ ├── dashboard/page.tsx
+│ │ ├── students/
+│ │ ├── professors/
+│ │ ├── courses/
+│ │ ├── grades/
+│ │ ├── messages/
+│ │ ├── ai/
+│ │ ├── finance/
+│ │ └── layout.tsx # Sidebar + garde d'auth + garde de rôle
+│ ├── (super-admin)/ # Back-office multi-tenant
+│ ├── api/ # Route handlers (webhooks CinetPay, etc.)
+│ └── layout.tsx # Layout racine + metadata SEO globale
 ├── components/
-│   ├── ui/                       # shadcn/ui (généré, ne pas modifier à la main)
-│   └── features/                 # Composants métier (StudentCard, GradeTable, etc.)
+│ ├── ui/ # shadcn/ui (généré, ne pas modifier à la main)
+│ └── features/ # Composants métier (StudentCard, GradeTable, etc.)
 ├── lib/
-│   ├── auth.ts                   # Config NextAuth
-│   ├── prisma.ts                 # Client Prisma singleton
-│   ├── permissions.ts            # RBAC — fonctions can(role, action, resource)
-│   ├── tenant.ts                 # Résolution et garde du tenant courant
-│   └── validations/              # Schémas Zod par entité
+│ ├── auth.ts # Config NextAuth
+│ ├── prisma.ts # Client Prisma singleton
+│ ├── permissions.ts # RBAC — fonctions can(role, action, resource)
+│ ├── tenant.ts # Résolution et garde du tenant courant
+│ └── validations/ # Schémas Zod par entité
 ├── prisma/
-│   ├── schema.prisma
-│   └── migrations/
+│ ├── schema.prisma
+│ └── migrations/
 ├── services/
-│   ├── ai/                       # Intégration Groq
-│   ├── payment/                  # Intégration CinetPay
-│   ├── email/
-│   └── pdf/
-├── docs/                         # Cette base de connaissance
+│ ├── ai/ # Intégration Groq
+│ ├── payment/ # Intégration CinetPay
+│ ├── email/
+│ └── pdf/
+├── docs/ # Cette base de connaissance
 ├── tests/
 └── public/
-```
+
+text
 
 ## 3. Règles d'architecture
 
