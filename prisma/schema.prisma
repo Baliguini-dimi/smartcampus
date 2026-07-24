@@ -1,0 +1,868 @@
+// ============================================================
+// SmartCampus SaaS — Schéma Prisma (PostgreSQL)
+// Multi-tenant | Gamification | Finance | IA | LMD
+// Converti depuis database/migrations/001_initial_schema.sql (MySQL)
+// Voir docs/PROJECT_KNOWLEDGE.md section 5 pour le modèle conceptuel
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum TenantStatus {
+  trial
+  active
+  suspended
+  expired
+  cancelled
+}
+
+enum UserRole {
+  super_admin
+  admin
+  professor
+  student
+  parent
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+  deleted
+}
+
+enum StudentStatus {
+  active
+  suspended
+  graduated
+  dropped
+  on_leave
+}
+
+enum ProfessorStatus {
+  active
+  on_leave
+  retired
+  terminated
+}
+
+enum CourseType {
+  CM
+  TD
+  TP
+  Mixte
+}
+
+enum CourseStatus {
+  active
+  inactive
+  archived
+}
+
+enum EnrollmentStatus {
+  enrolled
+  dropped
+  completed
+  failed
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  excused
+}
+
+enum AnnouncementPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum TargetRole {
+  all
+  admin
+  professor
+  student
+  parent
+}
+
+enum AiContext {
+  general
+  course
+  grades
+  career
+}
+
+enum AiConversationStatus {
+  active
+  archived
+}
+
+enum AiMessageRole {
+  user
+  assistant
+  system
+}
+
+enum QuizOption {
+  a
+  b
+  c
+  d
+}
+
+enum InvoiceStatus {
+  pending
+  paid
+  partial
+  cancelled
+  overdue
+}
+
+enum PaymentMethod {
+  mobile_money
+  cash
+  bank_transfer
+  card
+}
+
+enum PaymentStatus {
+  pending
+  success
+  failed
+  refunded
+}
+
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  cancelled
+  expired
+}
+
+enum BillingCycle {
+  monthly
+  yearly
+}
+
+// ============================================================
+// 1. PLANS D'ABONNEMENT
+// ============================================================
+model Plan {
+  id            Int      @id @default(autoincrement())
+  name          String   @db.VarChar(50) // 'free', 'pro', 'premium'
+  label         String   @db.VarChar(100)
+  priceMonth    Decimal  @default(0) @map("price_month") @db.Decimal(10, 2)
+  priceYear     Decimal  @default(0) @map("price_year") @db.Decimal(10, 2)
+  currency      String   @default("FCFA") @db.VarChar(10)
+  maxStudents   Int      @default(50) @map("max_students")
+  maxCourses    Int      @default(10) @map("max_courses")
+  maxProfessors Int      @default(5) @map("max_professors")
+  maxAiCalls    Int      @default(20) @map("max_ai_calls") // par mois
+  features      Json?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenants       Tenant[]
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+// ============================================================
+// 2. TENANTS (Établissements)
+// ============================================================
+model Tenant {
+  id                 Int          @id @default(autoincrement())
+  name               String       @db.VarChar(255)
+  slug               String       @unique @db.VarChar(100) // 'iua', 'uvci'
+  email              String       @unique @db.VarChar(255)
+  phone              String?      @db.VarChar(20)
+  address            String?
+  city               String?      @db.VarChar(100)
+  country            String       @default("Côte d'Ivoire") @db.VarChar(100)
+  logo               String?      @db.VarChar(255)
+  primaryColor       String       @default("#0b2b4f") @map("primary_color") @db.VarChar(7)
+  accentColor        String       @default("#ffb347") @map("accent_color") @db.VarChar(7)
+  planId             Int          @default(1) @map("plan_id")
+  status             TenantStatus @default(trial)
+  trialEndsAt        DateTime?    @map("trial_ends_at") @db.Date
+  subscriptionEndsAt DateTime?    @map("subscription_ends_at") @db.Date
+  timezone           String       @default("Africa/Abidjan") @db.VarChar(50)
+  locale             String       @default("fr") @db.VarChar(10)
+  settings           Json?
+  aiCallsUsed        Int          @default(0) @map("ai_calls_used")
+  aiCallsResetAt     DateTime?    @map("ai_calls_reset_at") @db.Date
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  plan             Plan               @relation(fields: [planId], references: [id])
+  users            User[]
+  students         Student[]
+  professors       Professor[]
+  courses          Course[]
+  enrollments      Enrollment[]
+  grades           Grade[]
+  attendance       Attendance[]
+  schedules        Schedule[]
+  messages         Message[]
+  announcements    Announcement[]
+  aiConversations  AiConversation[]
+  quizzes          Quiz[]
+  quizAttempts     QuizAttempt[]
+  userBadges       UserBadge[]
+  xpTransactions   XpTransaction[]
+  notifications    Notification[]
+  invoices         Invoice[]
+  payments         Payment[]
+  subscriptions    Subscription[]
+  activityLogs     ActivityLog[]
+
+  @@index([slug])
+  @@index([status])
+  @@map("tenants")
+}
+
+// ============================================================
+// 3. UTILISATEURS
+// ============================================================
+model User {
+  id               Int        @id @default(autoincrement())
+  tenantId         Int?       @map("tenant_id") // NULL = super_admin
+  email            String     @db.VarChar(255)
+  password         String     @db.VarChar(255)
+  firstName        String     @map("first_name") @db.VarChar(100)
+  lastName         String     @map("last_name") @db.VarChar(100)
+  role             UserRole   @default(student)
+  status           UserStatus @default(active)
+  phone            String?    @db.VarChar(20)
+  avatar           String?    @db.VarChar(255)
+  bio              String?
+  preferences      Json?
+  // Auth
+  rememberToken    String?    @map("remember_token") @db.VarChar(100)
+  resetToken       String?    @map("reset_token") @db.VarChar(100)
+  resetExpiresAt   DateTime?  @map("reset_expires_at")
+  emailVerifiedAt  DateTime?  @map("email_verified_at")
+  // Activité
+  lastLoginAt      DateTime?  @map("last_login_at")
+  lastIp           String?    @map("last_ip") @db.VarChar(45)
+  loginCount       Int        @default(0) @map("login_count")
+  // Gamification
+  xpPoints         Int        @default(0) @map("xp_points")
+  level            Int        @default(1)
+  streakDays       Int        @default(0) @map("streak_days")
+  lastActivityAt   DateTime?  @map("last_activity_at") @db.Date
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  tenant              Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student             Student?
+  professor           Professor?
+  sentMessages        Message[]        @relation("MessageSender")
+  receivedMessages     Message[]       @relation("MessageRecipient")
+  announcements       Announcement[]
+  aiConversations     AiConversation[]
+  createdQuizzes      Quiz[]
+  userBadges          UserBadge[]
+  xpTransactions      XpTransaction[]
+  notifications       Notification[]
+  activityLogs        ActivityLog[]
+
+  @@unique([email, tenantId], name: "unique_email_tenant")
+  @@index([tenantId])
+  @@index([role])
+  @@index([status])
+  @@index([resetToken])
+  @@map("users")
+}
+
+// ============================================================
+// 4. ÉTUDIANTS
+// ============================================================
+model Student {
+  id                 Int           @id @default(autoincrement())
+  tenantId           Int           @map("tenant_id")
+  userId             Int           @unique @map("user_id")
+  matricule          String        @db.VarChar(50)
+  department         String?       @db.VarChar(100)
+  fieldOfStudy       String?       @map("field_of_study") @db.VarChar(150)
+  level              String?       @db.VarChar(50) // L1, L2, L3, M1, M2, D1
+  academicYear       String?       @map("academic_year") @db.VarChar(9) // 2024-2025
+  enrollmentDate     DateTime?     @map("enrollment_date") @db.Date
+  graduationDate     DateTime?     @map("graduation_date") @db.Date
+  gpa                Decimal       @default(0.00) @db.Decimal(4, 2)
+  status             StudentStatus @default(active)
+  parentEmail        String?       @map("parent_email") @db.VarChar(255) // portail parents
+  scholarship        Boolean       @default(false)
+  scholarshipAmount  Decimal       @default(0) @map("scholarship_amount") @db.Decimal(10, 2)
+  notes              String?
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollments  Enrollment[]
+  grades       Grade[]
+  attendance   Attendance[]
+  quizAttempts QuizAttempt[]
+  invoices     Invoice[]
+
+  @@unique([matricule, tenantId], name: "unique_matricule_tenant")
+  @@index([tenantId])
+  @@index([department])
+  @@index([level])
+  @@index([status])
+  @@map("students")
+}
+
+// ============================================================
+// 5. PROFESSEURS
+// ============================================================
+model Professor {
+  id             Int             @id @default(autoincrement())
+  tenantId       Int             @map("tenant_id")
+  userId         Int             @unique @map("user_id")
+  employeeId     String          @map("employee_id") @db.VarChar(50)
+  department     String?         @db.VarChar(100)
+  specialization String?         @db.VarChar(150)
+  qualification  String?         @db.VarChar(100) // PhD, Master, etc.
+  officeLocation String?         @map("office_location") @db.VarChar(100)
+  officeHours    String?         @map("office_hours")
+  hireDate       DateTime?       @map("hire_date") @db.Date
+  status         ProfessorStatus @default(active)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courses   Course[]
+  grades    Grade[]
+  schedules Schedule[]
+
+  @@unique([employeeId, tenantId], name: "unique_employee_tenant")
+  @@index([tenantId])
+  @@map("professors")
+}
+
+// ============================================================
+// 6. COURS
+// ============================================================
+model Course {
+  id            Int          @id @default(autoincrement())
+  tenantId      Int          @map("tenant_id")
+  professorId   Int?         @map("professor_id")
+  code          String       @db.VarChar(50)
+  title         String       @db.VarChar(255)
+  description   String?
+  objectives    String?
+  syllabus      String?
+  department    String?      @db.VarChar(100)
+  level         String?      @db.VarChar(50) // M1, L3, etc.
+  credits       Decimal      @default(3) @db.Decimal(4, 1)
+  coefficient   Decimal      @default(1) @db.Decimal(4, 2)
+  capacity      Int          @default(50)
+  semester      Int          @default(1) @db.SmallInt
+  academicYear  String?      @map("academic_year") @db.VarChar(9)
+  type          CourseType   @default(CM)
+  status        CourseStatus @default(active)
+  resources     Json? // [{type, title, url}]
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professor   Professor?   @relation(fields: [professorId], references: [id], onDelete: SetNull)
+  enrollments Enrollment[]
+  grades      Grade[]
+  attendance  Attendance[]
+  schedules   Schedule[]
+  quizzes     Quiz[]
+
+  @@unique([code, tenantId, academicYear], name: "unique_code_tenant_year")
+  @@index([tenantId])
+  @@index([semester])
+  @@index([status])
+  @@map("courses")
+}
+
+// ============================================================
+// 7. INSCRIPTIONS AUX COURS
+// ============================================================
+model Enrollment {
+  id             Int              @id @default(autoincrement())
+  tenantId       Int              @map("tenant_id")
+  courseId       Int              @map("course_id")
+  studentId      Int              @map("student_id")
+  enrolledAt     DateTime         @default(now()) @map("enrolled_at")
+  status         EnrollmentStatus @default(enrolled)
+  completionPct  Int              @default(0) @map("completion_pct") @db.SmallInt
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  grades  Grade[]
+
+  @@unique([courseId, studentId], name: "unique_enrollment")
+  @@index([tenantId])
+  @@index([courseId])
+  @@index([studentId])
+  @@map("enrollments")
+}
+
+// ============================================================
+// 8. NOTES
+// ============================================================
+model Grade {
+  id                Int       @id @default(autoincrement())
+  tenantId          Int       @map("tenant_id")
+  enrollmentId      Int?      @map("enrollment_id")
+  courseId          Int       @map("course_id")
+  studentId         Int       @map("student_id")
+  professorId       Int?      @map("professor_id")
+  // Composantes de la note (pondérables)
+  assignmentScore   Decimal?  @map("assignment_score") @db.Decimal(5, 2)
+  midtermScore      Decimal?  @map("midterm_score") @db.Decimal(5, 2)
+  finalScore        Decimal?  @map("final_score") @db.Decimal(5, 2)
+  bonusScore        Decimal?  @map("bonus_score") @db.Decimal(5, 2)
+  // Pondérations (en %)
+  assignmentWeight  Int       @default(20) @map("assignment_weight") @db.SmallInt
+  midtermWeight     Int       @default(30) @map("midterm_weight") @db.SmallInt
+  finalWeight       Int       @default(50) @map("final_weight") @db.SmallInt
+  // Résultat calculé
+  averageScore      Decimal?  @map("average_score") @db.Decimal(5, 2)
+  letterGrade       String?   @map("letter_grade") @db.VarChar(3)
+  mention           String?   @db.VarChar(20)
+  isValidated       Boolean   @default(false) @map("is_validated")
+  rattrapageScore   Decimal?  @map("rattrapage_score") @db.Decimal(5, 2)
+  comments          String?
+  gradedAt          DateTime? @map("graded_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  enrollment Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  course     Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student    Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  professor  Professor?  @relation(fields: [professorId], references: [id], onDelete: SetNull)
+
+  @@unique([courseId, studentId], name: "unique_grade")
+  @@index([tenantId])
+  @@index([studentId])
+  @@map("grades")
+}
+
+// ============================================================
+// 9. PRÉSENCES
+// ============================================================
+model Attendance {
+  id          Int              @id @default(autoincrement())
+  tenantId    Int              @map("tenant_id")
+  courseId    Int              @map("course_id")
+  studentId   Int              @map("student_id")
+  sessionDate DateTime         @map("session_date") @db.Date
+  status      AttendanceStatus @default(present)
+  notedBy     Int?             @map("noted_by") // professor_id
+  note        String?          @db.VarChar(255)
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, studentId, sessionDate], name: "unique_attendance")
+  @@index([tenantId])
+  @@index([sessionDate])
+  @@map("attendance")
+}
+
+// ============================================================
+// 10. EMPLOI DU TEMPS
+// ============================================================
+model Schedule {
+  id           Int      @id @default(autoincrement())
+  tenantId     Int      @map("tenant_id")
+  courseId     Int      @map("course_id")
+  professorId  Int?     @map("professor_id")
+  dayOfWeek    Int      @map("day_of_week") @db.SmallInt // 1=Lundi ... 7=Dimanche
+  startTime    DateTime @map("start_time") @db.Time
+  endTime      DateTime @map("end_time") @db.Time
+  classroom    String?  @db.VarChar(100)
+  semester     Int?     @db.SmallInt
+  academicYear String?  @map("academic_year") @db.VarChar(9)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  course    Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  professor Professor? @relation(fields: [professorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([dayOfWeek])
+  @@map("schedules")
+}
+
+// ============================================================
+// 11. MESSAGES
+// ============================================================
+model Message {
+  id          Int       @id @default(autoincrement())
+  tenantId    Int       @map("tenant_id")
+  senderId    Int       @map("sender_id")
+  recipientId Int       @map("recipient_id")
+  subject     String?   @db.VarChar(255)
+  content     String
+  isRead      Boolean   @default(false) @map("is_read")
+  readAt      DateTime? @map("read_at")
+  parentId    Int?      @map("parent_id") // fils de discussion
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sender    User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User      @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  parent    Message?  @relation("MessageThread", fields: [parentId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageThread")
+
+  @@index([tenantId])
+  @@index([recipientId])
+  @@index([senderId])
+  @@index([isRead])
+  @@map("messages")
+}
+
+// ============================================================
+// 12. ANNONCES
+// ============================================================
+model Announcement {
+  id           Int                  @id @default(autoincrement())
+  tenantId     Int                  @map("tenant_id")
+  authorId     Int                  @map("author_id")
+  title        String               @db.VarChar(255)
+  content      String
+  priority     AnnouncementPriority @default(medium)
+  targetRole   TargetRole           @default(all) @map("target_role")
+  targetDept   String?              @map("target_dept") @db.VarChar(100)
+  isPublished  Boolean              @default(true) @map("is_published")
+  publishedAt  DateTime             @default(now()) @map("published_at")
+  expiresAt    DateTime?            @map("expires_at")
+  viewsCount   Int                  @default(0) @map("views_count")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([priority])
+  @@index([isPublished])
+  @@map("announcements")
+}
+
+// ============================================================
+// 13. IA — CONVERSATIONS ET MESSAGES
+// ============================================================
+model AiConversation {
+  id         Int                   @id @default(autoincrement())
+  tenantId   Int                   @map("tenant_id")
+  userId     Int                   @map("user_id")
+  title      String                @default("Nouvelle conversation") @db.VarChar(255)
+  context    AiContext             @default(general)
+  status     AiConversationStatus  @default(active)
+  tokensUsed Int                   @default(0) @map("tokens_used")
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AiMessage[]
+
+  @@index([tenantId])
+  @@index([userId])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             Int           @id @default(autoincrement())
+  conversationId Int           @map("conversation_id")
+  role           AiMessageRole @default(user)
+  content        String
+  tokens         Int           @default(0)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("ai_messages")
+}
+
+// ============================================================
+// 14. QUIZ
+// ============================================================
+model Quiz {
+  id           Int      @id @default(autoincrement())
+  tenantId     Int      @map("tenant_id")
+  courseId     Int      @map("course_id")
+  createdBy    Int      @map("created_by") // professor user_id
+  title        String   @db.VarChar(255)
+  description  String?
+  timeLimit    Int      @default(0) @map("time_limit") // minutes (0 = pas de limite)
+  maxAttempts  Int      @default(1) @map("max_attempts")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  course    Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  author    User           @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+
+  @@index([tenantId])
+  @@index([courseId])
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id          Int        @id @default(autoincrement())
+  quizId      Int        @map("quiz_id")
+  question    String
+  optionA     String     @map("option_a") @db.VarChar(500)
+  optionB     String     @map("option_b") @db.VarChar(500)
+  optionC     String     @map("option_c") @db.VarChar(500)
+  optionD     String     @map("option_d") @db.VarChar(500)
+  correct     QuizOption
+  explanation String?
+  points      Int        @default(1)
+  position    Int        @default(0)
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@map("quiz_questions")
+}
+
+model QuizAttempt {
+  id         Int       @id @default(autoincrement())
+  tenantId   Int       @map("tenant_id")
+  quizId     Int       @map("quiz_id")
+  studentId  Int       @map("student_id")
+  answers    Json? // {question_id: 'a', ...}
+  score      Decimal?  @db.Decimal(5, 2)
+  maxScore   Int?      @map("max_score")
+  percentage Decimal?  @db.Decimal(5, 2)
+  passed     Boolean   @default(false)
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quiz    Quiz    @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([studentId])
+  @@map("quiz_attempts")
+}
+
+// ============================================================
+// 15. GAMIFICATION
+// ============================================================
+model Badge {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique @db.VarChar(50) // 'first_login', 'top_student'
+  name        String   @db.VarChar(100)
+  description String?
+  icon        String?  @db.VarChar(100) // nom icône Lucide
+  color       String   @default("#ffb347") @db.VarChar(7)
+  xpReward    Int      @default(10) @map("xp_reward")
+  condition   Json? // condition de déclenchement
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  userBadges UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  userId    Int      @map("user_id")
+  badgeId   Int      @map("badge_id")
+  earnedAt  DateTime @default(now()) @map("earned_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge  Badge  @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId], name: "unique_user_badge")
+  @@index([tenantId])
+  @@index([userId])
+  @@map("user_badges")
+}
+
+model XpTransaction {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  userId    Int      @map("user_id")
+  amount    Int // peut être négatif
+  reason    String?  @db.VarChar(255)
+  reference String?  @db.VarChar(100) // ex: 'quiz:42', 'badge:first_login'
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@map("xp_transactions")
+}
+
+// ============================================================
+// 16. NOTIFICATIONS
+// ============================================================
+model Notification {
+  id        Int       @id @default(autoincrement())
+  tenantId  Int       @map("tenant_id")
+  userId    Int       @map("user_id")
+  type      String    @db.VarChar(100) // 'new_grade', 'new_message', 'badge_earned'
+  title     String    @db.VarChar(255)
+  body      String?
+  icon      String    @default("bell") @db.VarChar(50) // nom icône Lucide
+  link      String?   @db.VarChar(500)
+  isRead    Boolean   @default(false) @map("is_read")
+  readAt    DateTime? @map("read_at")
+  data      Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// ============================================================
+// 17. FINANCE (Frais de scolarité)
+// ============================================================
+model Invoice {
+  id          Int           @id @default(autoincrement())
+  tenantId    Int           @map("tenant_id")
+  studentId   Int           @map("student_id")
+  number      String        @unique @db.VarChar(50) // INV-2025-00001
+  amount      Decimal       @db.Decimal(10, 2)
+  currency    String        @default("FCFA") @db.VarChar(10)
+  status      InvoiceStatus @default(pending)
+  dueDate     DateTime?     @map("due_date") @db.Date
+  description String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model Payment {
+  id            Int           @id @default(autoincrement())
+  tenantId      Int           @map("tenant_id")
+  invoiceId     Int           @map("invoice_id")
+  amount        Decimal       @db.Decimal(10, 2)
+  method        PaymentMethod @default(mobile_money)
+  provider      String?       @db.VarChar(50) // 'cinetpay', 'orange_money'
+  transactionId String?       @map("transaction_id") @db.VarChar(255)
+  status        PaymentStatus @default(pending)
+  paidAt        DateTime?     @map("paid_at")
+  receiptUrl    String?       @map("receipt_url") @db.VarChar(500)
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([transactionId])
+  @@map("payments")
+}
+
+// ============================================================
+// 18. ABONNEMENTS SAAS
+// ============================================================
+model Subscription {
+  id            Int                 @id @default(autoincrement())
+  tenantId      Int                 @map("tenant_id")
+  planId        Int                 @map("plan_id")
+  status        SubscriptionStatus  @default(trialing)
+  amount        Decimal?            @db.Decimal(10, 2)
+  currency      String              @default("FCFA") @db.VarChar(10)
+  billingCycle  BillingCycle        @default(monthly) @map("billing_cycle")
+  startsAt      DateTime?           @map("starts_at") @db.Date
+  endsAt        DateTime?           @map("ends_at") @db.Date
+  cancelledAt   DateTime?           @map("cancelled_at")
+  transactionId String?             @map("transaction_id") @db.VarChar(255)
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+// ============================================================
+// 19. LOGS D'ACTIVITÉ
+// ============================================================
+model ActivityLog {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int?     @map("tenant_id")
+  userId      Int?     @map("user_id")
+  action      String   @db.VarChar(100) // 'login', 'grade.created', etc.
+  subject     String?  @db.VarChar(100) // 'user', 'grade', 'course'
+  subjectId   Int?     @map("subject_id")
+  description String?
+  ipAddress   String?  @map("ip_address") @db.VarChar(45)
+  userAgent   String?  @map("user_agent") @db.VarChar(500)
+  data        Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// ============================================================
+// 20. RATE LIMITING
+// ============================================================
+model RateLimit {
+  id          Int       @id @default(autoincrement())
+  keyHash     String    @unique @map("key_hash") @db.VarChar(64)
+  attempts    Int       @default(1)
+  lockedUntil DateTime? @map("locked_until")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([keyHash])
+  @@map("rate_limits")
+}

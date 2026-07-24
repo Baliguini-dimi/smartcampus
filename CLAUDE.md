@@ -1,1 +1,2 @@
 @AGENTS.md
+@docs/PROJECT_AI_RULES.md
