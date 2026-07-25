@@ -1,5 +1,6 @@
 ﻿"use server";
 
+import { Prisma } from "@/app/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { registerSchema, forgotPasswordSchema, resetPasswordSchema } from "@/lib/validations/auth";
@@ -49,30 +50,42 @@ export async function registerTenant(
 
   const passwordHash = await hashPassword(data.password);
 
-  await prisma.$transaction(async (tx) => {
-    const tenant = await tx.tenant.create({
-      data: {
-        name: data.tenantName,
-        slug: data.tenantSlug,
-        email: data.email,
-        planId: freePlan.id,
-        status: "trial",
-        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-      },
-    });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: {
+          name: data.tenantName,
+          slug: data.tenantSlug,
+          email: data.email,
+          planId: freePlan.id,
+          status: "trial",
+          trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        },
+      });
 
-    await tx.user.create({
-      data: {
-        tenantId: tenant.id,
-        email: data.email,
-        password: passwordHash,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        role: "admin",
-        status: "active",
-      },
+      await tx.user.create({
+        data: {
+          tenantId: tenant.id,
+          email: data.email,
+          password: passwordHash,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          role: "admin",
+          status: "active",
+        },
+      });
     });
-  });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return {
+        fieldErrors: {
+          email: "Cet email est deja utilise par un autre etablissement.",
+        },
+      };
+    }
+    console.error("registerTenant error:", e);
+    return { error: "Une erreur est survenue, reessayez dans un instant." };
+  }
 
   await signIn("credentials", {
     email: data.email,
@@ -104,8 +117,6 @@ export async function requestPasswordReset(
     where: { email: parsed.data.email, status: "active" },
   });
 
-  // Toujours repondre "submitted: true", meme si l'utilisateur n'existe pas
-  // (ne jamais reveler si un email est enregistre ou non).
   if (user) {
     const { rawToken, hashedToken, expiresAt } = generateResetToken();
 
@@ -114,7 +125,6 @@ export async function requestPasswordReset(
       data: { resetToken: hashedToken, resetExpiresAt: expiresAt },
     });
 
-    // TODO Phase 4 : remplacer par un envoi Resend reel.
     console.log(
       `[DEV] Lien de reinitialisation pour ${user.email} : /reset-password?token=${rawToken}`
     );
