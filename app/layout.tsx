@@ -1,9 +1,6 @@
-import type { Metadata } from "next";
-import { Syne, DM_Sans, JetBrains_Mono, Inter } from "next/font/google";
+﻿import type { Metadata } from "next";
+import { Syne, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { cn } from "@/lib/utils";
-
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
 const syne = Syne({
   variable: "--font-syne",
@@ -58,7 +55,7 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={cn("h-full", "antialiased", syne.variable, dmSans.variable, jetbrainsMono.variable, "font-sans", inter.variable)}
+      className={`${syne.variable} ${dmSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
