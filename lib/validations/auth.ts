@@ -23,3 +23,13 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(8, "8 caracteres minimum"),
 });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const demoRequestSchema = z.object({
+  institutionName: z.string().min(2, "Nom de l etablissement requis"),
+  contactName: z.string().min(2, "Nom requis"),
+  email: z.string().email("Email invalide"),
+  phone: z.string().optional(),
+  message: z.string().optional(),
+});
+export type DemoRequestInput = z.infer<typeof demoRequestSchema>;
+

@@ -4,9 +4,9 @@ const columns = [
   {
     title: "Produit",
     links: [
-      { label: "Modules", href: "/#modules" },
-      { label: "Tarifs", href: "/pricing" },
-      { label: "Securite", href: "/#securite" },
+      { label: "Fonctionnalités", href: "/#modules" },
+      { label: "Tarifs", href: "/#tarifs" },
+      { label: "Sécurité", href: "/#securite" },
     ],
   },
   {
@@ -14,20 +14,20 @@ const columns = [
     links: [
       { label: "Documentation", href: "#" },
       { label: "Centre d'aide", href: "#" },
-      { label: "Statut du service", href: "#" },
+      { label: "État des services", href: "#" },
     ],
   },
   {
     title: "Entreprise",
     links: [
-      { label: "A propos", href: "#" },
+      { label: "À propos", href: "#" },
       { label: "Contact", href: "#" },
     ],
   },
   {
-    title: "Legal",
+    title: "Légal",
     links: [
-      { label: "Confidentialite", href: "#" },
+      { label: "Politique de confidentialité", href: "#" },
       { label: "Conditions d'utilisation", href: "#" },
     ],
   },
@@ -43,8 +43,8 @@ export function SiteFooter() {
               SmartCampus
             </span>
             <p className="mt-3 text-sm">
-              Gestion academique pour les etablissements d&apos;Afrique
-              francophone.
+              La plateforme qui accompagne les établissements d&apos;Afrique
+              francophone dans leur gestion académique et administrative.
             </p>
           </div>
           {columns.map((col) => (
@@ -63,8 +63,8 @@ export function SiteFooter() {
           ))}
         </div>
         <div className="mt-12 border-t border-white/10 pt-6 text-xs">
-          © {new Date().getFullYear()} SmartCampus. Fait pour les
-          etablissements d&apos;Afrique francophone.
+          © 2026 SmartCampus. Tous droits réservés. Conçu pour les
+          établissements d&apos;Afrique francophone.
         </div>
       </div>
     </footer>

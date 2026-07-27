@@ -866,3 +866,24 @@ model RateLimit {
   @@index([keyHash])
   @@map("rate_limits")
 }
+// ============================================================
+// 21. DEMANDES DE DEMO (lead capture, page marketing)
+// ============================================================
+enum DemoRequestStatus {
+  new
+  contacted
+  closed
+}
+
+model DemoRequest {
+  id             Int               @id @default(autoincrement())
+  institutionName String           @map("institution_name") @db.VarChar(255)
+  contactName    String            @map("contact_name") @db.VarChar(200)
+  email          String            @db.VarChar(255)
+  phone          String?           @db.VarChar(20)
+  message        String?
+  status         DemoRequestStatus @default(new)
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  @@map("demo_requests")
+}
