@@ -1,11 +1,12 @@
 ﻿import Link from "next/link";
-import { LayoutDashboard, Users, GraduationCap } from "lucide-react";
+import { LayoutDashboard, Users, GraduationCap, BookOpen } from "lucide-react";
 import { getCurrentTenant } from "@/lib/tenant";
 
 const navItems = [
   { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/students", label: "Etudiants", icon: Users },
   { href: "/professors", label: "Professeurs", icon: GraduationCap },
+  { href: "/courses", label: "Cours", icon: BookOpen },
 ];
 
 export default async function AppLayout({
