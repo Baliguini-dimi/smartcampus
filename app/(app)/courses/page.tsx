@@ -1,5 +1,5 @@
 ﻿import Link from "next/link";
-import { BookPlus, Pencil } from "lucide-react";
+import { BookPlus, Pencil, Users } from "lucide-react";
 import { getCurrentTenant } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { DeleteCourseButton } from "@/components/features/delete-course-button";
@@ -78,6 +78,13 @@ export default async function CoursesPage() {
                         aria-label="Modifier"
                       >
                         <Pencil className="h-4 w-4" />
+                      </Link>
+                      <Link
+                        href={`/courses/${c.id}/enrollments`}
+                        className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-navy"
+                        aria-label="Voir les inscrits"
+                      >
+                        <Users className="h-4 w-4" />
                       </Link>
                       <DeleteCourseButton courseId={c.id} courseName={`${c.code} - ${c.title}`} />
                     </div>
